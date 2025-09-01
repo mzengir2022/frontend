@@ -5,8 +5,10 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Checkbox } from "./ui/checkbox";
-import { ArrowLeft, Utensils, Users, MapPin, Phone, Mail, Building, Eye, EyeOff, Lock } from "lucide-react";
+import { ArrowLeft, Utensils, Users, MapPin, Phone, Mail, Building, Eye, EyeOff, Lock, Loader2 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { signUp } from "../services/api";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 interface SignupPageProps {
   onBack: () => void;
@@ -37,6 +39,8 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const restaurantTypes = [
     "رستوران سنتی",
@@ -110,19 +114,29 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
     }
   };
 
-  const handleSubmit = () => {
-    // Here you would typically send the data to your backend
-    console.log("Restaurant signup data:", formData);
-    
-    // Show success message
-    alert(`خوش آمدید، ${formData.ownerName}! حساب کاربری شما برای ${formData.restaurantName} با موفقیت ایجاد شد.`);
-    
-    // Navigate to admin panel
-    onSignup();
+  const handleSubmit = async () => {
+    if (!validateStep2()) return;
+
+    setIsLoading(true);
+    setApiError(null);
+
+    try {
+      const response = await signUp(formData);
+      if (response.token) {
+        localStorage.setItem('authToken', response.token);
+      }
+      alert(`خوش آمدید، ${formData.ownerName}! حساب کاربری شما برای ${formData.restaurantName} با موفقیت ایجاد شد.`);
+      onSignup();
+    } catch (err: any) {
+      setApiError(err.response?.data?.message || "An unexpected error occurred during sign up.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateFormData = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setApiError(null);
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
@@ -192,6 +206,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                 <CardContent className="space-y-6">
                   {currentStep === 1 ? (
                     <>
+                      {/* Step 1 Form Fields... (unchanged, but should be disabled when isLoading) */}
                       <div className="space-y-2">
                         <Label htmlFor="restaurantName">نام رستوران *</Label>
                         <Input
@@ -200,6 +215,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                           value={formData.restaurantName}
                           onChange={(e) => updateFormData("restaurantName", e.target.value)}
                           className={errors.restaurantName ? "border-destructive" : ""}
+                          disabled={isLoading}
                         />
                         {errors.restaurantName && (
                           <p className="text-sm text-destructive">{errors.restaurantName}</p>
@@ -208,9 +224,10 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
 
                       <div className="space-y-2">
                         <Label htmlFor="restaurantType">نوع رستوران *</Label>
-                        <Select 
-                          value={formData.restaurantType} 
+                        <Select
+                          value={formData.restaurantType}
                           onValueChange={(value) => updateFormData("restaurantType", value)}
+                          disabled={isLoading}
                         >
                           <SelectTrigger className={errors.restaurantType ? "border-destructive" : ""}>
                             <SelectValue placeholder="نوع رستوران خود را انتخاب کنید" />
@@ -236,6 +253,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                           value={formData.address}
                           onChange={(e) => updateFormData("address", e.target.value)}
                           className={errors.address ? "border-destructive" : ""}
+                          disabled={isLoading}
                         />
                         {errors.address && (
                           <p className="text-sm text-destructive">{errors.address}</p>
@@ -251,6 +269,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             value={formData.city}
                             onChange={(e) => updateFormData("city", e.target.value)}
                             className={errors.city ? "border-destructive" : ""}
+                            disabled={isLoading}
                           />
                           {errors.city && (
                             <p className="text-sm text-destructive">{errors.city}</p>
@@ -263,6 +282,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             placeholder="1234567890"
                             value={formData.zipCode}
                             onChange={(e) => updateFormData("zipCode", e.target.value)}
+                            disabled={isLoading}
                           />
                         </div>
                       </div>
@@ -275,6 +295,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                           value={formData.phone}
                           onChange={(e) => updateFormData("phone", e.target.value)}
                           className={errors.phone ? "border-destructive" : ""}
+                          disabled={isLoading}
                         />
                         {errors.phone && (
                           <p className="text-sm text-destructive">{errors.phone}</p>
@@ -283,6 +304,12 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                     </>
                   ) : (
                     <>
+                      {apiError && (
+                        <Alert variant="destructive">
+                          <AlertTitle>Error</AlertTitle>
+                          <AlertDescription>{apiError}</AlertDescription>
+                        </Alert>
+                      )}
                       <div className="space-y-2">
                         <Label htmlFor="ownerName">نام و نام خانوادگی *</Label>
                         <Input
@@ -291,6 +318,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                           value={formData.ownerName}
                           onChange={(e) => updateFormData("ownerName", e.target.value)}
                           className={errors.ownerName ? "border-destructive" : ""}
+                          disabled={isLoading}
                         />
                         {errors.ownerName && (
                           <p className="text-sm text-destructive">{errors.ownerName}</p>
@@ -308,13 +336,13 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             value={formData.email}
                             onChange={(e) => updateFormData("email", e.target.value)}
                             className={`pl-10 ${errors.email ? "border-destructive" : ""}`}
+                            disabled={isLoading}
                           />
                         </div>
                         {errors.email && (
                           <p className="text-sm text-destructive">{errors.email}</p>
                         )}
                       </div>
-
                       <div className="space-y-2">
                         <Label htmlFor="password">رمز عبور *</Label>
                         <div className="relative">
@@ -326,6 +354,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             value={formData.password}
                             onChange={(e) => updateFormData("password", e.target.value)}
                             className={`pl-10 pr-10 ${errors.password ? "border-destructive" : ""}`}
+                            disabled={isLoading}
                           />
                           <Button
                             type="button"
@@ -333,6 +362,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             size="sm"
                             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                             onClick={() => setShowPassword(!showPassword)}
+                            disabled={isLoading}
                           >
                             {showPassword ? (
                               <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -357,6 +387,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             value={formData.confirmPassword}
                             onChange={(e) => updateFormData("confirmPassword", e.target.value)}
                             className={`pl-10 pr-10 ${errors.confirmPassword ? "border-destructive" : ""}`}
+                            disabled={isLoading}
                           />
                           <Button
                             type="button"
@@ -364,6 +395,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             size="sm"
                             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            disabled={isLoading}
                           >
                             {showConfirmPassword ? (
                               <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -383,6 +415,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             id="agreeToTerms"
                             checked={formData.agreeToTerms}
                             onCheckedChange={(checked) => updateFormData("agreeToTerms", checked as boolean)}
+                            disabled={isLoading}
                           />
                           <Label htmlFor="agreeToTerms" className="text-sm leading-relaxed">
                             با <a href="#" className="text-primary hover:underline">شرایط خدمات</a> و{" "}
@@ -398,6 +431,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                             id="agreeToMarketing"
                             checked={formData.agreeToMarketing}
                             onCheckedChange={(checked) => updateFormData("agreeToMarketing", checked as boolean)}
+                            disabled={isLoading}
                           />
                           <Label htmlFor="agreeToMarketing" className="text-sm leading-relaxed">
                             دوست دارم نکات، به‌روزرسانی‌ها و پیشنهادات ویژه Menuza را دریافت کنم
@@ -413,6 +447,7 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                         variant="outline" 
                         onClick={() => setCurrentStep(1)}
                         className="flex-1"
+                        disabled={isLoading}
                       >
                         بازگشت
                       </Button>
@@ -420,7 +455,9 @@ export function SignupPage({ onBack, onSignup, onSwitchToLogin }: SignupPageProp
                     <Button 
                       onClick={handleNextStep}
                       className="flex-1 bg-primary hover:bg-primary/90"
+                      disabled={isLoading}
                     >
+                      {isLoading && currentStep === 2 && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       {currentStep === 1 ? "ادامه" : "ایجاد حساب کاربری"}
                     </Button>
                   </div>

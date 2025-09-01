@@ -3,12 +3,14 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { ArrowLeft, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { signIn } from "../services/api";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 interface LoginPageProps {
   onBack: () => void;
-  onLogin: () => void;
+  onLogin: ()_=> void;
   onSwitchToSignup: () => void;
 }
 
@@ -18,23 +20,33 @@ export function LoginPage({ onBack, onLogin, onSwitchToSignup }: LoginPageProps)
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setError(null);
   };
 
-  const handleSubmit = () => {
-    // Here you would typically validate and send the data to your backend
-    console.log("Login data:", formData);
-    
-    // Show success message
-    alert(`خوش آمدید! ورود شما موفقیت‌آمیز بود.`);
-    
-    // Navigate to admin panel
-    onLogin();
+  const handleSubmit = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const response = await signIn(formData);
+      // Assuming the backend returns a token
+      if (response.token) {
+        localStorage.setItem('authToken', response.token);
+      }
+      alert(`خوش آمدید! ورود شما موفقیت‌آمیز بود.`);
+      onLogin();
+    } catch (err: any) {
+      setError(err.response?.data?.message || "An unexpected error occurred.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const isFormValid = formData.email && formData.password;
+  const isFormValid = formData.email && formData.password && !isLoading;
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,6 +95,12 @@ export function LoginPage({ onBack, onLogin, onSwitchToSignup }: LoginPageProps)
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="email">ایمیل</Label>
                   <div className="relative">
@@ -94,6 +112,7 @@ export function LoginPage({ onBack, onLogin, onSwitchToSignup }: LoginPageProps)
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
                       className="pl-10"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -109,6 +128,7 @@ export function LoginPage({ onBack, onLogin, onSwitchToSignup }: LoginPageProps)
                       value={formData.password}
                       onChange={(e) => handleInputChange("password", e.target.value)}
                       className="pl-10 pr-10"
+                      disabled={isLoading}
                     />
                     <Button
                       type="button"
@@ -116,6 +136,7 @@ export function LoginPage({ onBack, onLogin, onSwitchToSignup }: LoginPageProps)
                       size="sm"
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -131,6 +152,7 @@ export function LoginPage({ onBack, onLogin, onSwitchToSignup }: LoginPageProps)
                   disabled={!isFormValid}
                   className="w-full bg-primary hover:bg-primary/90"
                 >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   ورود به پنل
                 </Button>
 

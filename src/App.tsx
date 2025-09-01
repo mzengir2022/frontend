@@ -7,7 +7,10 @@ import { AdminPanel } from "./components/AdminPanel";
 type Page = "landing" | "signup" | "login" | "admin";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("landing");
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const token = localStorage.getItem('authToken');
+    return token ? 'admin' : 'landing';
+  });
 
   const handleGetStarted = () => {
     setCurrentPage("signup");
@@ -38,6 +41,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('authToken');
     setCurrentPage("landing");
   };
 
